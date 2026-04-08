@@ -52,7 +52,7 @@ export class AuthService {
       throw new ConflictException('Email already in use');
     }
 
-    const saltRounds = 12;
+    const saltRounds = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
     const passwordHash = await bcrypt.hash(dto.password, saltRounds);
 
     const user = await this.prisma.user.create({

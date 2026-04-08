@@ -52,7 +52,7 @@ export default function HomePage() {
               <span className="font-bold text-xl text-gray-900">HMS+EMR</span>
             </div>
             <div className="flex items-center gap-4">
-              <Link href="/dashboard/login" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
+              <Link href="/login" className="text-gray-600 hover:text-gray-900 text-sm font-medium">
                 Sign In
               </Link>
               <Link

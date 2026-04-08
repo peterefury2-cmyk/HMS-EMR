@@ -42,30 +42,26 @@ export class AppointmentsService {
     const scheduledAt = new Date(data.scheduledAt);
     const endAt = new Date(scheduledAt.getTime() + (data.duration || 30) * 60000);
 
-    // Check for overlapping appointments: existing starts before new ends AND existing ends after new starts
-    const conflict = await this.prisma.appointment.findFirst({
+    // Check for overlapping appointments using Prisma raw query for accurate overlap detection.
+    // Two intervals [A_start, A_end) and [B_start, B_end) overlap iff A_start < B_end AND A_end > B_start.
+    // We fetch candidates where scheduledAt < endAt, then filter in-process for the other direction.
+    const candidates = await this.prisma.appointment.findMany({
       where: {
         tenantId,
         doctorId: data.doctorId,
         status: { notIn: ['CANCELLED', 'NO_SHOW'] },
-        AND: [
-          { scheduledAt: { lt: endAt } },
-          {
-            // Filter to only appointments whose end time overlaps
-            // We approximate by checking appointments starting after (scheduledAt - maxDuration)
-            scheduledAt: { gte: new Date(scheduledAt.getTime() - 24 * 60 * 60 * 1000) },
-          },
-        ],
+        scheduledAt: { lt: endAt },
       },
+      select: { id: true, scheduledAt: true, duration: true },
+    });
+
+    const conflict = candidates.find((appt) => {
+      const apptEnd = new Date(new Date(appt.scheduledAt).getTime() + appt.duration * 60000);
+      return apptEnd > scheduledAt;
     });
 
     if (conflict) {
-      const conflictEnd = new Date(
-        new Date(conflict.scheduledAt).getTime() + conflict.duration * 60000,
-      );
-      if (conflictEnd > scheduledAt) {
-        throw new BadRequestException('Doctor already has an appointment in this time slot');
-      }
+      throw new BadRequestException('Doctor already has an appointment in this time slot');
     }
 
     return this.prisma.appointment.create({
