@@ -42,12 +42,20 @@ export class AppointmentsService {
     const scheduledAt = new Date(data.scheduledAt);
     const endAt = new Date(scheduledAt.getTime() + (data.duration || 30) * 60000);
 
+    // Check for overlapping appointments: existing starts before new ends AND existing ends after new starts
     const conflict = await this.prisma.appointment.findFirst({
       where: {
         tenantId,
         doctorId: data.doctorId,
         status: { notIn: ['CANCELLED', 'NO_SHOW'] },
-        scheduledAt: { lt: endAt },
+        AND: [
+          { scheduledAt: { lt: endAt } },
+          {
+            // Filter to only appointments whose end time overlaps
+            // We approximate by checking appointments starting after (scheduledAt - maxDuration)
+            scheduledAt: { gte: new Date(scheduledAt.getTime() - 24 * 60 * 60 * 1000) },
+          },
+        ],
       },
     });
 

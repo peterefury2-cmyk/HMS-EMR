@@ -24,7 +24,10 @@ export class NotificationsService {
         },
       });
     } catch (error) {
-      this.logger.warn('Redis not available, notifications will be logged only');
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Redis not available (${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}): ${message}. Notifications will be logged only.`,
+      );
     }
   }
 
