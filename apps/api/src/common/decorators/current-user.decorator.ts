@@ -1,13 +1,7 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Role } from '@prisma/client';
-import { RequestWithUser } from '../types/request-with-user.type';
+import { RequestWithUser, CurrentUserPayload } from '../types/request-with-user.type';
 
-export interface CurrentUserPayload {
-  userId: string;
-  email: string;
-  role: Role;
-  tenantId: string | null;
-}
+export type { CurrentUserPayload };
 
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): CurrentUserPayload => {

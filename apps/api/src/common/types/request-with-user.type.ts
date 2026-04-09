@@ -1,5 +1,5 @@
-import { Request } from 'express';
 import { Role } from '@prisma/client';
+import { Request } from 'express';
 
 export interface RequestUser {
   userId: string;
@@ -7,6 +7,8 @@ export interface RequestUser {
   role: Role;
   tenantId: string | null;
 }
+
+export type CurrentUserPayload = RequestUser;
 
 export interface RequestWithUser extends Request {
   user: RequestUser;
