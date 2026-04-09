@@ -1,0 +1,71 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hms_postgres
+    environment:
+      POSTGRES_USER: hms_user
+      POSTGRES_PASSWORD: hms_password
+      POSTGRES_DB: hms_emr
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hms_user -d hms_emr']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hms_redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: hms_api
+    ports:
+      - '3001:3001'
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://hms_user:hms_password@postgres:5432/hms_emr
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-super-secret-change-in-production}
+      JWT_EXPIRES_IN: 7d
+      PORT: 3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: hms_web
+    ports:
+      - '3000:3000'
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NODE_ENV: production
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
