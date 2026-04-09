@@ -65,14 +65,16 @@ export class AiService {
     patientAge?: number,
     patientGender?: string,
   ): Promise<SymptomAnalysisResult> {
-    void patientAge;
-    void patientGender;
+    // TODO: Integrate with external AI/ML service using patientAge and patientGender for personalized analysis
+    const isHighUrgency = symptoms.some((s) =>
+      ['chest pain', 'shortness of breath', 'severe headache'].includes(s.toLowerCase()),
+    );
     return {
       possibleConditions: [
         { condition: 'Common Cold', probability: 'HIGH', icdCode: 'J00' },
         { condition: 'Influenza', probability: 'MEDIUM', icdCode: 'J11' },
       ],
-      urgencyLevel: symptoms.includes('chest pain') ? 'HIGH' : 'LOW',
+      urgencyLevel: isHighUrgency ? 'HIGH' : 'LOW',
       recommendedActions: [
         'Rest and hydration',
         'Monitor temperature',
@@ -104,17 +106,21 @@ export class AiService {
     vitalSigns?: Record<string, number>,
     existingDiagnoses?: string[],
   ): Promise<ClinicalDecisionResult> {
-    void symptoms;
-    void vitalSigns;
-    void existingDiagnoses;
+    // TODO: Integrate with clinical decision support AI using symptoms, vitalSigns, and existingDiagnoses
+    const hasHighVitals = vitalSigns && (vitalSigns['temperature'] > 38.5 || vitalSigns['heartRate'] > 100);
+    const redFlags = hasHighVitals ? ['Elevated vitals detected — urgent review recommended'] : [];
+    const hasPriorDiagnoses = existingDiagnoses && existingDiagnoses.length > 0;
     return {
       recommendations: [
-        { action: 'Complete blood count (CBC)', rationale: 'Rule out infection', priority: 1 },
-        { action: 'Metabolic panel', rationale: 'Assess organ function', priority: 2 },
+        ...(hasPriorDiagnoses ? [{ action: 'Review prior diagnoses', rationale: 'Patient has existing conditions', priority: 1 }] : []),
+        { action: 'Complete blood count (CBC)', rationale: 'Rule out infection', priority: hasPriorDiagnoses ? 2 : 1 },
+        { action: 'Metabolic panel', rationale: 'Assess organ function', priority: hasPriorDiagnoses ? 3 : 2 },
       ],
-      differentialDiagnoses: ['Viral upper respiratory infection', 'Bacterial sinusitis'],
+      differentialDiagnoses: symptoms.length > 0
+        ? ['Viral upper respiratory infection', 'Bacterial sinusitis']
+        : ['General review recommended'],
       suggestedInvestigations: ['CBC', 'CRP', 'Throat swab culture'],
-      redFlags: [],
+      redFlags,
     };
   }
 

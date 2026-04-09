@@ -49,10 +49,13 @@ export class PermissionsGuard implements CanActivate {
 
     if (user.role === Role.SUPER_ADMIN) return true;
 
-    const userLevel = ROLE_HIERARCHY[user.role] ?? 0;
-    return requiredRoles.some((role) => {
-      const requiredLevel = ROLE_HIERARCHY[role] ?? 0;
-      return user.role === role || userLevel >= requiredLevel;
-    });
+    // Check for exact role match first
+    if (requiredRoles.includes(user.role)) return true;
+
+    // Allow SYSTEM_ADMIN and HOSPITAL_ADMIN to access any clinical endpoint
+    const adminRoles: Role[] = [Role.SYSTEM_ADMIN, Role.HOSPITAL_ADMIN];
+    if (adminRoles.includes(user.role)) return true;
+
+    return false;
   }
 }

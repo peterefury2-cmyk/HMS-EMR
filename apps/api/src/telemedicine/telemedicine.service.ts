@@ -57,11 +57,13 @@ export class TelemedicineService {
 
   async endSession(id: string, tenantId: string) {
     const session = await this.findOne(id, tenantId);
-    void session; // duration tracking not in schema
+    const endedAt = new Date();
+    const durationMs = session.startedAt ? endedAt.getTime() - new Date(session.startedAt).getTime() : 0;
+    const durationMinutes = Math.round(durationMs / 60000);
 
     return this.prisma.telemedicineSession.update({
       where: { id },
-      data: { status: 'ENDED', endedAt: new Date() },
+      data: { status: 'ENDED', endedAt, ...(durationMinutes > 0 && { notes: `Duration: ${durationMinutes} minutes` }) },
     });
   }
 
