@@ -4,6 +4,32 @@ import { Role } from '../enums/roles.enum';
 
 export const PERMISSIONS_KEY = 'permissions';
 
+interface RequestUser {
+  userId: string;
+  role: Role;
+  tenantId?: string;
+}
+
+interface AuthenticatedRequest {
+  user: RequestUser;
+}
+
+const ROLE_HIERARCHY: Record<Role, number> = {
+  [Role.SUPER_ADMIN]: 100,
+  [Role.SYSTEM_ADMIN]: 90,
+  [Role.HOSPITAL_ADMIN]: 80,
+  [Role.DOCTOR]: 60,
+  [Role.NURSE]: 55,
+  [Role.PHARMACIST]: 50,
+  [Role.LAB_SCIENTIST]: 50,
+  [Role.RADIOLOGIST]: 50,
+  [Role.BILLING_OFFICER]: 45,
+  [Role.RECEPTIONIST]: 40,
+  [Role.INSURANCE_PROVIDER]: 35,
+  [Role.ENTERPRISE_CLIENT]: 30,
+  [Role.PATIENT]: 10,
+};
+
 @Injectable()
 export class PermissionsGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
@@ -18,16 +44,15 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest();
-    if (!user) {
-      return false;
-    }
+    const { user } = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    if (!user) return false;
 
-    // Super admin always has access
-    if (user.role === Role.SUPER_ADMIN) {
-      return true;
-    }
+    if (user.role === Role.SUPER_ADMIN) return true;
 
-    return requiredRoles.some((role) => user.role === role);
+    const userLevel = ROLE_HIERARCHY[user.role] ?? 0;
+    return requiredRoles.some((role) => {
+      const requiredLevel = ROLE_HIERARCHY[role] ?? 0;
+      return user.role === role || userLevel >= requiredLevel;
+    });
   }
 }

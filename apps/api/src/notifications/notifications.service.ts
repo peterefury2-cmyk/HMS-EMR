@@ -1,5 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { NotificationType, NotificationStatus } from '@prisma/client';
 import { Queue } from 'bullmq';
+
+interface CreateNotificationData {
+  userId: string;
+  tenantId?: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+}
 
 export interface NotificationPayload {
   to: string;
@@ -15,7 +26,7 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private notificationQueue: Queue | null = null;
 
-  constructor() {
+  constructor(private prisma: PrismaService) {
     try {
       this.notificationQueue = new Queue('notifications', {
         connection: {
@@ -26,9 +37,46 @@ export class NotificationsService {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `Redis not available (${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || '6379'}): ${message}. Notifications will be logged only.`,
+        `Redis not available: ${message}. Notifications will be logged only.`,
       );
     }
+  }
+
+  async createNotification(data: CreateNotificationData) {
+    return this.prisma.notification.create({
+      data: {
+        userId: data.userId,
+        tenantId: data.tenantId,
+        type: data.type,
+        title: data.title,
+        body: data.body,
+        data: data.data,
+      },
+    });
+  }
+
+  async getUserNotifications(userId: string, unreadOnly = false) {
+    return this.prisma.notification.findMany({
+      where: {
+        userId,
+        ...(unreadOnly ? { status: { not: NotificationStatus.READ } } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async markAsRead(notificationId: string, userId: string) {
+    return this.prisma.notification.updateMany({
+      where: { id: notificationId, userId },
+      data: { status: NotificationStatus.READ, readAt: new Date() },
+    });
+  }
+
+  async markAllAsRead(userId: string) {
+    return this.prisma.notification.updateMany({
+      where: { userId, status: { not: NotificationStatus.READ } },
+      data: { status: NotificationStatus.READ, readAt: new Date() },
+    });
   }
 
   async sendNotification(payload: NotificationPayload): Promise<void> {
@@ -51,7 +99,11 @@ export class NotificationsService {
     await this.sendNotification({ to, message, type: 'SMS', tenantId });
   }
 
-  async sendAppointmentReminder(patientEmail: string, appointmentDate: Date, doctorName: string): Promise<void> {
+  async sendAppointmentReminder(
+    patientEmail: string,
+    appointmentDate: Date,
+    doctorName: string,
+  ): Promise<void> {
     await this.sendEmail(
       patientEmail,
       'Appointment Reminder',

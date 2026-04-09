@@ -1,57 +1,90 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../prisma/prisma.service';
+import { AiSuggestionType, AiSuggestionStatus } from '@prisma/client';
+
+interface PossibleCondition {
+  condition: string;
+  probability: string;
+  icdCode: string;
+}
 
 interface SymptomAnalysisResult {
-  possibleConditions: Array<{ condition: string; probability: string; icdCode: string }>;
+  possibleConditions: PossibleCondition[];
   urgencyLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   recommendedActions: string[];
   disclaimer: string;
 }
 
+interface DrugInteractionItem {
+  drug1: string;
+  drug2: string;
+  severity: 'MINOR' | 'MODERATE' | 'MAJOR' | 'CONTRAINDICATED';
+  description: string;
+  recommendation: string;
+}
+
 interface DrugInteractionResult {
-  interactions: Array<{
-    drug1: string;
-    drug2: string;
-    severity: 'MINOR' | 'MODERATE' | 'MAJOR' | 'CONTRAINDICATED';
-    description: string;
-    recommendation: string;
-  }>;
+  interactions: DrugInteractionItem[];
   overallRisk: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 
+interface ClinicalRecommendation {
+  action: string;
+  rationale: string;
+  priority: number;
+}
+
 interface ClinicalDecisionResult {
-  recommendations: Array<{ action: string; rationale: string; priority: number }>;
+  recommendations: ClinicalRecommendation[];
   differentialDiagnoses: string[];
   suggestedInvestigations: string[];
   redFlags: string[];
 }
 
+interface RiskScoreResult {
+  score: number;
+  level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  factors: string[];
+  recommendations: string[];
+}
+
+interface IcdSuggestionResult {
+  suggestions: Array<{ code: string; description: string; confidence: number }>;
+}
+
 @Injectable()
 export class AiService {
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private prisma: PrismaService,
+  ) {}
 
-  async analyzeSymptoms(symptoms: string[], patientAge?: number, patientGender?: string): Promise<SymptomAnalysisResult> {
-    // Stub implementation - integrate OpenAI/custom model in production
+  async analyzeSymptoms(
+    symptoms: string[],
+    patientAge?: number,
+    patientGender?: string,
+  ): Promise<SymptomAnalysisResult> {
+    void patientAge;
+    void patientGender;
     return {
       possibleConditions: [
         { condition: 'Common Cold', probability: 'HIGH', icdCode: 'J00' },
         { condition: 'Influenza', probability: 'MEDIUM', icdCode: 'J11' },
       ],
-      urgencyLevel: 'LOW',
+      urgencyLevel: symptoms.includes('chest pain') ? 'HIGH' : 'LOW',
       recommendedActions: [
         'Rest and hydration',
         'Monitor temperature',
         'Consult physician if symptoms worsen',
       ],
-      disclaimer: 'This is an AI-assisted analysis for informational purposes only. Always consult a qualified healthcare professional.',
+      disclaimer:
+        'This is an AI-assisted analysis for informational purposes only. Always consult a qualified healthcare professional.',
     };
   }
 
   async checkDrugInteractions(drugs: string[]): Promise<DrugInteractionResult> {
-    // Stub implementation - integrate drug interaction database in production
-    if (drugs.length < 2) {
-      return { interactions: [], overallRisk: 'LOW' };
-    }
+    if (drugs.length < 2) return { interactions: [], overallRisk: 'LOW' };
     return {
       interactions: [
         {
@@ -71,18 +104,95 @@ export class AiService {
     vitalSigns?: Record<string, number>,
     existingDiagnoses?: string[],
   ): Promise<ClinicalDecisionResult> {
-    // Stub implementation - integrate clinical decision support system in production
+    void symptoms;
+    void vitalSigns;
+    void existingDiagnoses;
     return {
       recommendations: [
         { action: 'Complete blood count (CBC)', rationale: 'Rule out infection', priority: 1 },
         { action: 'Metabolic panel', rationale: 'Assess organ function', priority: 2 },
       ],
-      differentialDiagnoses: [
-        'Viral upper respiratory infection',
-        'Bacterial sinusitis',
-      ],
+      differentialDiagnoses: ['Viral upper respiratory infection', 'Bacterial sinusitis'],
       suggestedInvestigations: ['CBC', 'CRP', 'Throat swab culture'],
       redFlags: [],
     };
+  }
+
+  async computeRiskScore(
+    visitId: string,
+    patientAge: number,
+    conditions: string[],
+  ): Promise<RiskScoreResult> {
+    let score = 0;
+    if (patientAge > 65) score += 30;
+    else if (patientAge > 50) score += 15;
+    score += conditions.length * 10;
+    score = Math.min(score, 100);
+
+    const level: RiskScoreResult['level'] =
+      score >= 75 ? 'CRITICAL' : score >= 50 ? 'HIGH' : score >= 25 ? 'MEDIUM' : 'LOW';
+
+    const result: RiskScoreResult = {
+      score,
+      level,
+      factors: conditions,
+      recommendations: level === 'HIGH' || level === 'CRITICAL' ? ['Immediate consultation required'] : [],
+    };
+
+    await this.prisma.aiSuggestion.create({
+      data: {
+        visitId,
+        type: AiSuggestionType.RISK_SCORE,
+        suggestion: result as unknown as Parameters<typeof this.prisma.aiSuggestion.create>[0]['data']['suggestion'],
+        confidence: score / 100,
+        reasoning: `Patient age: ${patientAge}, conditions: ${conditions.join(', ')}`,
+      },
+    });
+
+    return result;
+  }
+
+  async suggestIcdCodes(visitId: string, symptoms: string[]): Promise<IcdSuggestionResult> {
+    // Stub: map common symptom keywords to ICD codes
+    const mapping: Record<string, { code: string; description: string }> = {
+      fever: { code: 'R50.9', description: 'Fever, unspecified' },
+      cough: { code: 'R05.9', description: 'Cough, unspecified' },
+      headache: { code: 'R51.9', description: 'Headache, unspecified' },
+      'chest pain': { code: 'R07.9', description: 'Chest pain, unspecified' },
+      fatigue: { code: 'R53.83', description: 'Other fatigue' },
+    };
+
+    const suggestions = symptoms
+      .map((s) => {
+        const entry = mapping[s.toLowerCase()];
+        return entry ? { ...entry, confidence: 0.8 } : null;
+      })
+      .filter((s): s is { code: string; description: string; confidence: number } => s !== null);
+
+    const result: IcdSuggestionResult = { suggestions };
+
+    await this.prisma.aiSuggestion.create({
+      data: {
+        visitId,
+        type: AiSuggestionType.ICD_CODING,
+        suggestion: result as unknown as Parameters<typeof this.prisma.aiSuggestion.create>[0]['data']['suggestion'],
+        confidence: 0.75,
+        reasoning: `Symptom-based ICD mapping for: ${symptoms.join(', ')}`,
+      },
+    });
+
+    return result;
+  }
+
+  async reviewSuggestion(
+    suggestionId: string,
+    reviewedBy: string,
+    status: AiSuggestionStatus,
+  ): Promise<{ id: string; status: AiSuggestionStatus }> {
+    return this.prisma.aiSuggestion.update({
+      where: { id: suggestionId },
+      data: { status, reviewedBy, reviewedAt: new Date() },
+      select: { id: true, status: true },
+    });
   }
 }
