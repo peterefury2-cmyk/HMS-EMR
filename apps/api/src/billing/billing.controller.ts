@@ -3,10 +3,13 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { BillingService } from './billing.service';
+import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { ProcessPaymentDto } from './dto/process-payment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../common/enums/roles.enum';
+import { RequestWithUser } from '../common/types/request-with-user.type';
 
 @ApiTags('Billing')
 @ApiBearerAuth()
@@ -18,42 +21,35 @@ export class BillingController {
   @Get('summary')
   @Roles(Role.BILLING_OFFICER, Role.HOSPITAL_ADMIN)
   @ApiOperation({ summary: 'Get billing summary' })
-  getSummary(@Request() req) {
+  getSummary(@Request() req: RequestWithUser) {
     return this.billingService.getBillingSummary(req.user.tenantId);
   }
 
   @Get('invoices')
   @Roles(Role.BILLING_OFFICER, Role.HOSPITAL_ADMIN)
   @ApiOperation({ summary: 'List invoices' })
-  findAll(@Request() req) {
+  findAll(@Request() req: RequestWithUser) {
     return this.billingService.findAllInvoices(req.user.tenantId);
   }
 
   @Post('invoices')
   @Roles(Role.BILLING_OFFICER, Role.HOSPITAL_ADMIN)
   @ApiOperation({ summary: 'Create invoice' })
-  create(@Request() req, @Body() body: any) {
+  create(@Request() req: RequestWithUser, @Body() body: CreateInvoiceDto) {
     return this.billingService.createInvoice(body, req.user.tenantId);
   }
 
   @Get('invoices/:id')
   @Roles(Role.BILLING_OFFICER, Role.HOSPITAL_ADMIN)
   @ApiOperation({ summary: 'Get invoice by ID' })
-  findOne(@Request() req, @Param('id') id: string) {
+  findOne(@Request() req: RequestWithUser, @Param('id') id: string) {
     return this.billingService.findOneInvoice(id, req.user.tenantId);
-  }
-
-  @Patch('invoices/:id')
-  @Roles(Role.BILLING_OFFICER, Role.HOSPITAL_ADMIN)
-  @ApiOperation({ summary: 'Update invoice' })
-  update(@Request() req, @Param('id') id: string, @Body() body: any) {
-    return this.billingService.updateInvoice(id, req.user.tenantId, body);
   }
 
   @Post('payments')
   @Roles(Role.BILLING_OFFICER, Role.HOSPITAL_ADMIN)
   @ApiOperation({ summary: 'Process payment' })
-  processPayment(@Request() req, @Body() body: any) {
+  processPayment(@Request() req: RequestWithUser, @Body() body: ProcessPaymentDto) {
     return this.billingService.processPayment(body, req.user.tenantId);
   }
 }
