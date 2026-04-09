@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { Role } from '../enums/roles.enum';
+import { Role } from '@prisma/client';
+import { RequestWithUser } from '../types/request-with-user.type';
 
 export const PERMISSIONS_KEY = 'permissions';
 
@@ -18,7 +19,8 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<RequestWithUser>();
+    const user = request.user;
     if (!user) {
       return false;
     }

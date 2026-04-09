@@ -2,11 +2,14 @@ import {
   Controller, Get, Post, Patch, Param, Body, UseGuards, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { TenantPlan } from '@prisma/client';
 import { SubscriptionsService } from './subscriptions.service';
+import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../common/enums/roles.enum';
+import { RequestWithUser } from '../common/types/request-with-user.type';
 
 @ApiTags('Subscriptions')
 @ApiBearerAuth()
@@ -25,14 +28,14 @@ export class SubscriptionsController {
   @Post()
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create subscription' })
-  create(@Body() body: any) {
-    return this.subscriptionsService.create(body);
+  create(@Body() dto: CreateSubscriptionDto) {
+    return this.subscriptionsService.create(dto);
   }
 
   @Get('my')
   @ApiOperation({ summary: 'Get my tenant subscription' })
-  findMine(@Request() req) {
-    return this.subscriptionsService.findByTenant(req.user.tenantId);
+  findMine(@Request() req: RequestWithUser) {
+    return this.subscriptionsService.findByTenant(req.user.tenantId ?? '');
   }
 
   @Get(':id')
@@ -45,14 +48,14 @@ export class SubscriptionsController {
   @Patch(':id')
   @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update subscription' })
-  update(@Param('id') id: string, @Body() body: any) {
-    return this.subscriptionsService.update(id, body);
+  update(@Param('id') id: string, @Body() dto: Partial<CreateSubscriptionDto>) {
+    return this.subscriptionsService.update(id, dto);
   }
 
   @Post('upgrade')
   @Roles(Role.HOSPITAL_ADMIN)
   @ApiOperation({ summary: 'Upgrade tenant plan' })
-  upgrade(@Request() req, @Body() body: { plan: string }) {
-    return this.subscriptionsService.upgradePlan(req.user.tenantId, body.plan);
+  upgrade(@Request() req: RequestWithUser, @Body() body: { plan: TenantPlan }) {
+    return this.subscriptionsService.upgradePlan(req.user.tenantId ?? '', body.plan);
   }
 }

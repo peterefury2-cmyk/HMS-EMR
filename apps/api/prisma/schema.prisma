@@ -128,6 +128,152 @@ enum SubscriptionStatus {
   TRIALING
 }
 
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+}
+
+enum Severity {
+  MILD
+  MODERATE
+  SEVERE
+  CRITICAL
+}
+
+enum DiagnosisType {
+  PRIMARY
+  SECONDARY
+  DIFFERENTIAL
+  COMPLICATION
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOBILE_MONEY
+  INSURANCE
+  STRIPE
+  PAYSTACK
+  FLUTTERWAVE
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum NotificationType {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+enum AiSuggestionType {
+  DIAGNOSIS
+  DRUG_INTERACTION
+  RISK_SCORE
+  ICD_CODE
+  TREATMENT_PLAN
+}
+
+enum AiSuggestionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REVIEWED
+}
+
+enum PreAuthStatus {
+  REQUESTED
+  APPROVED
+  DENIED
+  EXPIRED
+}
+
+enum FhirResourceType {
+  PATIENT
+  ENCOUNTER
+  OBSERVATION
+  CONDITION
+  MEDICATION_REQUEST
+  DIAGNOSTIC_REPORT
+  ALLERGY_INTOLERANCE
+  BUNDLE
+}
+
+enum IcdVersion {
+  ICD_10
+  ICD_11
+}
+
+enum SampleType {
+  BLOOD
+  URINE
+  STOOL
+  SPUTUM
+  SWAB
+  TISSUE
+  OTHER
+}
+
+enum SampleStatus {
+  COLLECTED
+  RECEIVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum QueuePriority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+enum QueueStatus {
+  WAITING
+  CALLED
+  IN_SERVICE
+  COMPLETED
+  SKIPPED
+}
+
+enum ImagingModality {
+  XRAY
+  CT
+  MRI
+  ULTRASOUND
+  PET
+  MAMMOGRAPHY
+  FLUOROSCOPY
+  NUCLEAR
+}
+
 // ─── Models ──────────────────────────────────────────────────────────────────
 
 model Tenant {
@@ -140,66 +286,129 @@ model Tenant {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  users           User[]
-  patients        Patient[]
-  appointments    Appointment[]
-  invoices        Invoice[]
-  drugs           Drug[]
-  prescriptions   Prescription[]
-  labOrders       LabOrder[]
-  labTests        LabTest[]
-  radiologyOrders RadiologyOrder[]
-  insurancePolicies InsurancePolicy[]
-  insuranceClaims InsuranceClaim[]
+  users                User[]
+  patients             Patient[]
+  appointments         Appointment[]
+  invoices             Invoice[]
+  drugs                Drug[]
+  prescriptions        Prescription[]
+  labOrders            LabOrder[]
+  labTests             LabTest[]
+  radiologyOrders      RadiologyOrder[]
+  insurancePolicies    InsurancePolicy[]
+  insuranceClaims      InsuranceClaim[]
   telemedicineSessions TelemedicineSession[]
-  subscription    Subscription?
-  auditLogs       AuditLog[]
-  visits          Visit[]
+  subscription         Subscription?
+  auditLogs            AuditLog[]
+  visits               Visit[]
+  departments          Department[]
+  branches             TenantBranch[]
+  notifications        Notification[]
+  aiSuggestions        AiSuggestion[]
+  usageRecords         UsageRecord[]
+  featureFlags         FeatureFlag[]
+  fhirResourceLogs     FhirResourceLog[]
+  preAuthorizations    PreAuthorization[]
+  queueEntries         QueueEntry[]
+  insuranceProviders   InsuranceProvider[]
 
   @@map("tenants")
 }
 
+model Department {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  code      String
+  headId    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("departments")
+}
+
+model TenantBranch {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  address   String
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("tenant_branches")
+}
+
 model User {
-  id           String   @id @default(cuid())
-  tenantId     String?
-  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(DOCTOR)
-  firstName    String
-  lastName     String
-  isActive     Boolean  @default(true)
-  mfaEnabled   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  tenantId          String?
+  tenant            Tenant?  @relation(fields: [tenantId], references: [id])
+  email             String   @unique
+  passwordHash      String
+  role              Role     @default(DOCTOR)
+  firstName         String
+  lastName          String
+  isActive          Boolean  @default(true)
+  mfaEnabled        Boolean  @default(false)
+  mfaSecret         String?
+  failedLoginCount  Int      @default(0)
+  lockedUntil       DateTime?
+  passwordResetToken String?
+  passwordResetExpiry DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  doctorVisits       Visit[]          @relation("DoctorVisits")
-  prescribedMeds     Medication[]
-  clinicalNotes      ClinicalNote[]
-  labOrders          LabOrder[]
-  radiologyOrders    RadiologyOrder[]
-  auditLogs          AuditLog[]
+  doctorVisits    Visit[]         @relation("DoctorVisits")
+  prescribedMeds  Medication[]
+  clinicalNotes   ClinicalNote[]
+  labOrders       LabOrder[]
+  radiologyOrders RadiologyOrder[]
+  auditLogs       AuditLog[]
+  sessions        Session[]
+  notifications   Notification[]
 
+  @@index([tenantId])
   @@map("users")
 }
 
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
 model Patient {
-  id               String   @id @default(cuid())
+  id               String     @id @default(cuid())
   tenantId         String
-  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  tenant           Tenant     @relation(fields: [tenantId], references: [id])
   patientNo        String
   firstName        String
   lastName         String
   dateOfBirth      DateTime
-  gender           String
+  gender           Gender
   phone            String
   email            String?
   address          String?
-  bloodGroup       String?
+  bloodGroup       BloodGroup?
   genotype         String?
   emergencyContact Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   visits            Visit[]
   appointments      Appointment[]
@@ -210,9 +419,63 @@ model Patient {
   labOrders         LabOrder[]
   radiologyOrders   RadiologyOrder[]
   insurancePolicies InsurancePolicy[]
+  nextOfKin         PatientNextOfKin[]
+  medicalHistories  MedicalHistory[]
+  consentRecords    ConsentRecord[]
+  queueEntries      QueueEntry[]
+  aiSuggestions     AiSuggestion[]
 
   @@unique([tenantId, patientNo])
+  @@index([tenantId])
+  @@index([createdAt])
   @@map("patients")
+}
+
+model PatientNextOfKin {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  firstName    String
+  lastName     String
+  relationship String
+  phone        String
+  email        String?
+  address      String?
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([patientId])
+  @@map("patient_next_of_kin")
+}
+
+model MedicalHistory {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  condition   String
+  icdCode     String?
+  onsetDate   DateTime?
+  resolvedDate DateTime?
+  isActive    Boolean  @default(true)
+  notes       String?
+  createdAt   DateTime @default(now())
+
+  @@index([patientId])
+  @@map("medical_histories")
+}
+
+model ConsentRecord {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  type        String
+  isConsented Boolean
+  notes       String?
+  signedAt    DateTime @default(now())
+
+  @@index([patientId])
+  @@map("consent_records")
 }
 
 model Visit {
@@ -235,7 +498,13 @@ model Visit {
   prescriptions   Prescription[]
   labOrders       LabOrder[]
   radiologyOrders RadiologyOrder[]
+  attachments     Attachment[]
+  aiSuggestions   AiSuggestion[]
 
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([status])
+  @@index([createdAt])
   @@map("visits")
 }
 
@@ -257,14 +526,17 @@ model ClinicalNote {
 }
 
 model Diagnosis {
-  id          String   @id @default(cuid())
-  visitId     String
-  visit       Visit    @relation(fields: [visitId], references: [id])
-  icdCode     String
-  description String
-  status      String   @default("ACTIVE")
-  createdAt   DateTime @default(now())
+  id            String        @id @default(cuid())
+  visitId       String
+  visit         Visit         @relation(fields: [visitId], references: [id])
+  icdCode       String
+  description   String
+  type          DiagnosisType @default(PRIMARY)
+  icdVersion    IcdVersion    @default(ICD_10)
+  status        String        @default("ACTIVE")
+  createdAt     DateTime      @default(now())
 
+  @@index([visitId])
   @@map("diagnoses")
 }
 
@@ -286,15 +558,34 @@ model VitalSigns {
   @@map("vital_signs")
 }
 
-model Allergy {
-  id        String   @id @default(cuid())
-  patientId String
-  patient   Patient  @relation(fields: [patientId], references: [id])
-  allergen  String
-  reaction  String?
-  severity  String   @default("MODERATE")
-  createdAt DateTime @default(now())
+model Attachment {
+  id          String   @id @default(cuid())
+  visitId     String?
+  visit       Visit?   @relation(fields: [visitId], references: [id])
+  tenantId    String
+  name        String
+  url         String
+  mimeType    String
+  size        Int
+  uploadedBy  String
+  createdAt   DateTime @default(now())
 
+  @@index([visitId])
+  @@map("attachments")
+}
+
+model Allergy {
+  id          String   @id @default(cuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  allergen    String
+  reaction    String?
+  severity    Severity @default(MODERATE)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([patientId])
   @@map("allergies")
 }
 
@@ -311,7 +602,25 @@ model Medication {
   prescriber   User     @relation(fields: [prescribedBy], references: [id])
   createdAt    DateTime @default(now())
 
+  @@index([patientId])
   @@map("medications")
+}
+
+model DoctorSchedule {
+  id          String   @id @default(cuid())
+  doctorId    String
+  tenantId    String
+  dayOfWeek   Int
+  startTime   String
+  endTime     String
+  slotMinutes Int      @default(30)
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([doctorId])
+  @@index([tenantId])
+  @@map("doctor_schedules")
 }
 
 model Appointment {
@@ -330,63 +639,117 @@ model Appointment {
   updatedAt   DateTime          @updatedAt
 
   telemedicineSession TelemedicineSession?
+  queueEntry          QueueEntry?
 
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([status])
   @@map("appointments")
 }
 
+model QueueEntry {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  patientId     String
+  patient       Patient       @relation(fields: [patientId], references: [id])
+  appointmentId String?       @unique
+  appointment   Appointment?  @relation(fields: [appointmentId], references: [id])
+  queueNumber   Int
+  priority      QueuePriority @default(NORMAL)
+  status        QueueStatus   @default(WAITING)
+  calledAt      DateTime?
+  servedAt      DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("queue_entries")
+}
+
 model Invoice {
-  id        String        @id @default(cuid())
-  tenantId  String
-  tenant    Tenant        @relation(fields: [tenantId], references: [id])
-  patientId String
-  patient   Patient       @relation(fields: [patientId], references: [id])
-  invoiceNo String        @unique
-  amount    Decimal       @db.Decimal(10, 2)
-  currency  String        @default("USD")
-  status    InvoiceStatus @default(DRAFT)
-  items     Json
-  paidAt    DateTime?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  patientId   String
+  patient     Patient       @relation(fields: [patientId], references: [id])
+  invoiceNo   String        @unique
+  subtotal    Decimal       @db.Decimal(10, 2) @default(0)
+  taxAmount   Decimal       @db.Decimal(10, 2) @default(0)
+  discount    Decimal       @db.Decimal(10, 2) @default(0)
+  amount      Decimal       @db.Decimal(10, 2)
+  currency    String        @default("USD")
+  status      InvoiceStatus @default(DRAFT)
+  items       Json
+  dueDate     DateTime?
+  paidAt      DateTime?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   payments        Payment[]
   insuranceClaims InsuranceClaim[]
 
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([status])
   @@map("invoices")
 }
 
 model Payment {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   invoiceId String
-  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
-  amount    Decimal  @db.Decimal(10, 2)
-  method    String
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id])
+  amount    Decimal       @db.Decimal(10, 2)
+  method    PaymentMethod @default(CASH)
   reference String?
   gateway   String?
-  status    String   @default("PENDING")
-  createdAt DateTime @default(now())
+  status    PaymentStatus @default(PENDING)
+  metadata  Json?
+  createdAt DateTime      @default(now())
 
+  @@index([invoiceId])
   @@map("payments")
 }
 
 model Drug {
-  id           String   @id @default(cuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  name         String
-  genericName  String?
-  category     String
-  unit         String
-  stock        Int      @default(0)
-  reorderLevel Int      @default(10)
-  expiryDate   DateTime?
-  price        Decimal  @db.Decimal(10, 2)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String    @id @default(cuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  name             String
+  genericName      String?
+  category         String
+  unit             String
+  stock            Int       @default(0)
+  reorderLevel     Int       @default(10)
+  expiryDate       DateTime?
+  batchNumber      String?
+  price            Decimal   @db.Decimal(10, 2)
+  isControlled     Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  prescriptionItems PrescriptionItem[]
+  prescriptionItems  PrescriptionItem[]
+  interactionsFrom   DrugInteraction[]  @relation("DrugA")
+  interactionsTo     DrugInteraction[]  @relation("DrugB")
 
+  @@index([tenantId])
   @@map("drugs")
+}
+
+model DrugInteraction {
+  id          String   @id @default(cuid())
+  drugAId     String
+  drugA       Drug     @relation("DrugA", fields: [drugAId], references: [id])
+  drugBId     String
+  drugB       Drug     @relation("DrugB", fields: [drugBId], references: [id])
+  severity    Severity
+  description String
+  recommendation String?
+  createdAt   DateTime @default(now())
+
+  @@unique([drugAId, drugBId])
+  @@map("drug_interactions")
 }
 
 model Prescription {
@@ -399,11 +762,15 @@ model Prescription {
   patient      Patient            @relation(fields: [patientId], references: [id])
   pharmacistId String?
   status       PrescriptionStatus @default(PENDING)
+  dispensedAt  DateTime?
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
   items PrescriptionItem[]
 
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([status])
   @@map("prescriptions")
 }
 
@@ -427,67 +794,131 @@ model LabTest {
   tenant         Tenant  @relation(fields: [tenantId], references: [id])
   name           String
   code           String
+  loincCode      String?
   category       String
   referenceRange String?
+  unit           String?
   price          Decimal @db.Decimal(10, 2)
 
   labOrderItems LabOrderItem[]
 
+  @@index([tenantId])
   @@map("lab_tests")
 }
 
 model LabOrder {
-  id            String         @id @default(cuid())
-  tenantId      String
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  visitId       String
-  visit         Visit          @relation(fields: [visitId], references: [id])
-  patientId     String
-  patient       Patient        @relation(fields: [patientId], references: [id])
+  id             String         @id @default(cuid())
+  tenantId       String
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  visitId        String
+  visit          Visit          @relation(fields: [visitId], references: [id])
+  patientId      String
+  patient        Patient        @relation(fields: [patientId], references: [id])
   labScientistId String?
-  labScientist  User?          @relation(fields: [labScientistId], references: [id])
-  status        LabOrderStatus @default(PENDING)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  labScientist   User?          @relation(fields: [labScientistId], references: [id])
+  status         LabOrderStatus @default(PENDING)
+  priority       QueuePriority  @default(NORMAL)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  items LabOrderItem[]
+  items   LabOrderItem[]
+  samples LabSample[]
 
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([status])
   @@map("lab_orders")
 }
 
+model LabSample {
+  id          String       @id @default(cuid())
+  labOrderId  String
+  labOrder    LabOrder     @relation(fields: [labOrderId], references: [id])
+  barcode     String       @unique
+  sampleType  SampleType
+  status      SampleStatus @default(COLLECTED)
+  collectedAt DateTime     @default(now())
+  receivedAt  DateTime?
+  notes       String?
+
+  @@index([labOrderId])
+  @@map("lab_samples")
+}
+
 model LabOrderItem {
-  id         String    @id @default(cuid())
-  labOrderId String
-  labOrder   LabOrder  @relation(fields: [labOrderId], references: [id])
-  labTestId  String
-  labTest    LabTest   @relation(fields: [labTestId], references: [id])
-  result     String?
-  unit       String?
-  status     String    @default("PENDING")
-  reportedAt DateTime?
+  id             String    @id @default(cuid())
+  labOrderId     String
+  labOrder       LabOrder  @relation(fields: [labOrderId], references: [id])
+  labTestId      String
+  labTest        LabTest   @relation(fields: [labTestId], references: [id])
+  result         String?
+  numericResult  Float?
+  unit           String?
+  isAbnormal     Boolean   @default(false)
+  isCritical     Boolean   @default(false)
+  status         String    @default("PENDING")
+  reportedAt     DateTime?
 
   @@map("lab_order_items")
 }
 
 model RadiologyOrder {
-  id           String               @id @default(cuid())
-  tenantId     String
-  tenant       Tenant               @relation(fields: [tenantId], references: [id])
-  visitId      String
-  visit        Visit                @relation(fields: [visitId], references: [id])
-  patientId    String
-  patient      Patient              @relation(fields: [patientId], references: [id])
+  id            String               @id @default(cuid())
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  visitId       String
+  visit         Visit                @relation(fields: [visitId], references: [id])
+  patientId     String
+  patient       Patient              @relation(fields: [patientId], references: [id])
   radiologistId String?
-  radiologist  User?                @relation(fields: [radiologistId], references: [id])
-  modality     String
-  bodyPart     String
-  indication   String?
-  status       RadiologyOrderStatus @default(PENDING)
-  report       String?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  radiologist   User?                @relation(fields: [radiologistId], references: [id])
+  modality      ImagingModality
+  bodyPart      String
+  indication    String?
+  status        RadiologyOrderStatus @default(PENDING)
+  report        String?
+  isCritical    Boolean              @default(false)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
+  dicomStudies DicomStudy[]
+
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([status])
   @@map("radiology_orders")
+}
+
+model DicomStudy {
+  id               String         @id @default(cuid())
+  radiologyOrderId String
+  radiologyOrder   RadiologyOrder @relation(fields: [radiologyOrderId], references: [id])
+  studyUid         String         @unique
+  studyDate        DateTime
+  accessionNumber  String?
+  pacsUrl          String?
+  createdAt        DateTime       @default(now())
+
+  @@map("dicom_studies")
+}
+
+model InsuranceProvider {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  code      String
+  contactEmail String?
+  contactPhone String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  policies         InsurancePolicy[]
+  preAuthorizations PreAuthorization[]
+
+  @@index([tenantId])
+  @@map("insurance_providers")
 }
 
 model InsurancePolicy {
@@ -497,15 +928,42 @@ model InsurancePolicy {
   patientId    String
   patient      Patient               @relation(fields: [patientId], references: [id])
   providerId   String
+  provider     InsuranceProvider     @relation(fields: [providerId], references: [id])
   policyNo     String
   coverageType String
+  maxCoverage  Decimal?              @db.Decimal(10, 2)
   startDate    DateTime
   endDate      DateTime
   status       InsurancePolicyStatus @default(ACTIVE)
 
-  claims InsuranceClaim[]
+  claims            InsuranceClaim[]
+  preAuthorizations PreAuthorization[]
 
+  @@index([tenantId])
+  @@index([patientId])
   @@map("insurance_policies")
+}
+
+model PreAuthorization {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  policyId    String
+  policy      InsurancePolicy @relation(fields: [policyId], references: [id])
+  providerId  String
+  provider    InsuranceProvider @relation(fields: [providerId], references: [id])
+  authCode    String?
+  procedure   String
+  amount      Decimal       @db.Decimal(10, 2)
+  status      PreAuthStatus @default(REQUESTED)
+  requestedAt DateTime      @default(now())
+  respondedAt DateTime?
+  expiresAt   DateTime?
+  notes       String?
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("pre_authorizations")
 }
 
 model InsuranceClaim {
@@ -518,10 +976,14 @@ model InsuranceClaim {
   policy      InsurancePolicy      @relation(fields: [policyId], references: [id])
   claimNo     String               @unique
   amount      Decimal              @db.Decimal(10, 2)
+  approvedAmount Decimal?          @db.Decimal(10, 2)
   status      InsuranceClaimStatus @default(SUBMITTED)
   submittedAt DateTime             @default(now())
   approvedAt  DateTime?
+  rejectionReason String?
 
+  @@index([tenantId])
+  @@index([status])
   @@map("insurance_claims")
 }
 
@@ -535,8 +997,69 @@ model TelemedicineSession {
   status        TelemedicineSessionStatus @default(WAITING)
   startedAt     DateTime?
   endedAt       DateTime?
+  durationMin   Int?
+
+  chatMessages ChatMessage[]
 
   @@map("telemedicine_sessions")
+}
+
+model ChatMessage {
+  id        String              @id @default(cuid())
+  sessionId String
+  session   TelemedicineSession @relation(fields: [sessionId], references: [id])
+  senderId  String
+  message   String
+  type      String              @default("TEXT")
+  sentAt    DateTime            @default(now())
+
+  @@index([sessionId])
+  @@map("chat_messages")
+}
+
+model Notification {
+  id        String             @id @default(cuid())
+  tenantId  String
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  userId    String?
+  user      User?              @relation(fields: [userId], references: [id])
+  type      NotificationType
+  status    NotificationStatus @default(PENDING)
+  recipient String
+  subject   String?
+  message   String
+  metadata  Json?
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+  @@map("notifications")
+}
+
+model AiSuggestion {
+  id          String             @id @default(cuid())
+  tenantId    String
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  patientId   String?
+  patient     Patient?           @relation(fields: [patientId], references: [id])
+  visitId     String?
+  visit       Visit?             @relation(fields: [visitId], references: [id])
+  type        AiSuggestionType
+  status      AiSuggestionStatus @default(PENDING)
+  input       Json
+  output      Json
+  confidence  Float?
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime           @default(now())
+
+  @@index([tenantId])
+  @@index([patientId])
+  @@index([createdAt])
+  @@map("ai_suggestions")
 }
 
 model Subscription {
@@ -553,7 +1076,53 @@ model Subscription {
   stripeSubscriptionId   String?
   paystackSubscriptionId String?
 
+  usageRecords UsageRecord[]
+
   @@map("subscriptions")
+}
+
+model UsageRecord {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  feature        String
+  quantity       Int      @default(1)
+  recordedAt     DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([recordedAt])
+  @@map("usage_records")
+}
+
+model FeatureFlag {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  feature   String
+  plan      TenantPlan?
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, feature])
+  @@map("feature_flags")
+}
+
+model FhirResourceLog {
+  id           String          @id @default(cuid())
+  tenantId     String
+  tenant       Tenant          @relation(fields: [tenantId], references: [id])
+  resourceType FhirResourceType
+  resourceId   String
+  fhirJson     Json
+  version      Int             @default(1)
+  createdAt    DateTime        @default(now())
+
+  @@index([tenantId])
+  @@index([resourceType])
+  @@map("fhir_resource_logs")
 }
 
 model AuditLog {
@@ -571,5 +1140,7 @@ model AuditLog {
   userAgent  String?
   createdAt  DateTime @default(now())
 
+  @@index([tenantId])
+  @@index([createdAt])
   @@map("audit_logs")
 }
