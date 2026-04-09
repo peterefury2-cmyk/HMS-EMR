@@ -1,0 +1,575 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  SYSTEM_ADMIN
+  HOSPITAL_ADMIN
+  DOCTOR
+  NURSE
+  PHARMACIST
+  LAB_SCIENTIST
+  RADIOLOGIST
+  RECEPTIONIST
+  BILLING_OFFICER
+  PATIENT
+  INSURANCE_PROVIDER
+  ENTERPRISE_CLIENT
+}
+
+enum TenantPlan {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+  GOVERNMENT
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum VisitType {
+  OUTPATIENT
+  INPATIENT
+  EMERGENCY
+  TELEMEDICINE
+}
+
+enum VisitStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NoteType {
+  SOAP
+  NARRATIVE
+}
+
+enum AppointmentType {
+  IN_PERSON
+  TELEMEDICINE
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PrescriptionStatus {
+  PENDING
+  DISPENSED
+  CANCELLED
+}
+
+enum LabOrderStatus {
+  PENDING
+  COLLECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RadiologyOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum InsurancePolicyStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum InsuranceClaimStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  PAID
+}
+
+enum TelemedicineSessionStatus {
+  WAITING
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIALING
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  plan      TenantPlan   @default(STARTER)
+  status    TenantStatus @default(ACTIVE)
+  settings  Json?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  users           User[]
+  patients        Patient[]
+  appointments    Appointment[]
+  invoices        Invoice[]
+  drugs           Drug[]
+  prescriptions   Prescription[]
+  labOrders       LabOrder[]
+  labTests        LabTest[]
+  radiologyOrders RadiologyOrder[]
+  insurancePolicies InsurancePolicy[]
+  insuranceClaims InsuranceClaim[]
+  telemedicineSessions TelemedicineSession[]
+  subscription    Subscription?
+  auditLogs       AuditLog[]
+  visits          Visit[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(DOCTOR)
+  firstName    String
+  lastName     String
+  isActive     Boolean  @default(true)
+  mfaEnabled   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  doctorVisits       Visit[]          @relation("DoctorVisits")
+  prescribedMeds     Medication[]
+  clinicalNotes      ClinicalNote[]
+  labOrders          LabOrder[]
+  radiologyOrders    RadiologyOrder[]
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+model Patient {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  patientNo        String
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime
+  gender           String
+  phone            String
+  email            String?
+  address          String?
+  bloodGroup       String?
+  genotype         String?
+  emergencyContact Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  visits            Visit[]
+  appointments      Appointment[]
+  medications       Medication[]
+  allergies         Allergy[]
+  invoices          Invoice[]
+  prescriptions     Prescription[]
+  labOrders         LabOrder[]
+  radiologyOrders   RadiologyOrder[]
+  insurancePolicies InsurancePolicy[]
+
+  @@unique([tenantId, patientNo])
+  @@map("patients")
+}
+
+model Visit {
+  id             String      @id @default(cuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id])
+  patientId      String
+  patient        Patient     @relation(fields: [patientId], references: [id])
+  doctorId       String
+  doctor         User        @relation("DoctorVisits", fields: [doctorId], references: [id])
+  type           VisitType   @default(OUTPATIENT)
+  chiefComplaint String
+  status         VisitStatus @default(SCHEDULED)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  clinicalNotes   ClinicalNote[]
+  diagnoses       Diagnosis[]
+  vitalSigns      VitalSigns[]
+  prescriptions   Prescription[]
+  labOrders       LabOrder[]
+  radiologyOrders RadiologyOrder[]
+
+  @@map("visits")
+}
+
+model ClinicalNote {
+  id          String   @id @default(cuid())
+  visitId     String
+  visit       Visit    @relation(fields: [visitId], references: [id])
+  type        NoteType @default(SOAP)
+  subjective  String?
+  objective   String?
+  assessment  String?
+  plan        String?
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("clinical_notes")
+}
+
+model Diagnosis {
+  id          String   @id @default(cuid())
+  visitId     String
+  visit       Visit    @relation(fields: [visitId], references: [id])
+  icdCode     String
+  description String
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+
+  @@map("diagnoses")
+}
+
+model VitalSigns {
+  id                     String   @id @default(cuid())
+  visitId                String
+  visit                  Visit    @relation(fields: [visitId], references: [id])
+  temperature            Float?
+  bloodPressureSystolic  Int?
+  bloodPressureDiastolic Int?
+  heartRate              Int?
+  respiratoryRate        Int?
+  oxygenSaturation       Float?
+  weight                 Float?
+  height                 Float?
+  bmi                    Float?
+  recordedAt             DateTime @default(now())
+
+  @@map("vital_signs")
+}
+
+model Allergy {
+  id        String   @id @default(cuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  allergen  String
+  reaction  String?
+  severity  String   @default("MODERATE")
+  createdAt DateTime @default(now())
+
+  @@map("allergies")
+}
+
+model Medication {
+  id           String   @id @default(cuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id])
+  name         String
+  dosage       String
+  frequency    String
+  startDate    DateTime
+  endDate      DateTime?
+  prescribedBy String
+  prescriber   User     @relation(fields: [prescribedBy], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@map("medications")
+}
+
+model Appointment {
+  id          String            @id @default(cuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  patientId   String
+  patient     Patient           @relation(fields: [patientId], references: [id])
+  doctorId    String
+  scheduledAt DateTime
+  duration    Int               @default(30)
+  type        AppointmentType   @default(IN_PERSON)
+  status      AppointmentStatus @default(SCHEDULED)
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  telemedicineSession TelemedicineSession?
+
+  @@map("appointments")
+}
+
+model Invoice {
+  id        String        @id @default(cuid())
+  tenantId  String
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  patientId String
+  patient   Patient       @relation(fields: [patientId], references: [id])
+  invoiceNo String        @unique
+  amount    Decimal       @db.Decimal(10, 2)
+  currency  String        @default("USD")
+  status    InvoiceStatus @default(DRAFT)
+  items     Json
+  paidAt    DateTime?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  payments        Payment[]
+  insuranceClaims InsuranceClaim[]
+
+  @@map("invoices")
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Decimal  @db.Decimal(10, 2)
+  method    String
+  reference String?
+  gateway   String?
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@map("payments")
+}
+
+model Drug {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  genericName  String?
+  category     String
+  unit         String
+  stock        Int      @default(0)
+  reorderLevel Int      @default(10)
+  expiryDate   DateTime?
+  price        Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  prescriptionItems PrescriptionItem[]
+
+  @@map("drugs")
+}
+
+model Prescription {
+  id           String             @id @default(cuid())
+  tenantId     String
+  tenant       Tenant             @relation(fields: [tenantId], references: [id])
+  visitId      String
+  visit        Visit              @relation(fields: [visitId], references: [id])
+  patientId    String
+  patient      Patient            @relation(fields: [patientId], references: [id])
+  pharmacistId String?
+  status       PrescriptionStatus @default(PENDING)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  items PrescriptionItem[]
+
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id             String       @id @default(cuid())
+  prescriptionId String
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id])
+  drugId         String
+  drug           Drug         @relation(fields: [drugId], references: [id])
+  quantity       Int
+  dosage         String
+  frequency      String
+  duration       String
+
+  @@map("prescription_items")
+}
+
+model LabTest {
+  id             String  @id @default(cuid())
+  tenantId       String
+  tenant         Tenant  @relation(fields: [tenantId], references: [id])
+  name           String
+  code           String
+  category       String
+  referenceRange String?
+  price          Decimal @db.Decimal(10, 2)
+
+  labOrderItems LabOrderItem[]
+
+  @@map("lab_tests")
+}
+
+model LabOrder {
+  id            String         @id @default(cuid())
+  tenantId      String
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  visitId       String
+  visit         Visit          @relation(fields: [visitId], references: [id])
+  patientId     String
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  labScientistId String?
+  labScientist  User?          @relation(fields: [labScientistId], references: [id])
+  status        LabOrderStatus @default(PENDING)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  items LabOrderItem[]
+
+  @@map("lab_orders")
+}
+
+model LabOrderItem {
+  id         String    @id @default(cuid())
+  labOrderId String
+  labOrder   LabOrder  @relation(fields: [labOrderId], references: [id])
+  labTestId  String
+  labTest    LabTest   @relation(fields: [labTestId], references: [id])
+  result     String?
+  unit       String?
+  status     String    @default("PENDING")
+  reportedAt DateTime?
+
+  @@map("lab_order_items")
+}
+
+model RadiologyOrder {
+  id           String               @id @default(cuid())
+  tenantId     String
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  visitId      String
+  visit        Visit                @relation(fields: [visitId], references: [id])
+  patientId    String
+  patient      Patient              @relation(fields: [patientId], references: [id])
+  radiologistId String?
+  radiologist  User?                @relation(fields: [radiologistId], references: [id])
+  modality     String
+  bodyPart     String
+  indication   String?
+  status       RadiologyOrderStatus @default(PENDING)
+  report       String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@map("radiology_orders")
+}
+
+model InsurancePolicy {
+  id           String                @id @default(cuid())
+  tenantId     String
+  tenant       Tenant                @relation(fields: [tenantId], references: [id])
+  patientId    String
+  patient      Patient               @relation(fields: [patientId], references: [id])
+  providerId   String
+  policyNo     String
+  coverageType String
+  startDate    DateTime
+  endDate      DateTime
+  status       InsurancePolicyStatus @default(ACTIVE)
+
+  claims InsuranceClaim[]
+
+  @@map("insurance_policies")
+}
+
+model InsuranceClaim {
+  id          String               @id @default(cuid())
+  tenantId    String
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
+  invoiceId   String
+  invoice     Invoice              @relation(fields: [invoiceId], references: [id])
+  policyId    String
+  policy      InsurancePolicy      @relation(fields: [policyId], references: [id])
+  claimNo     String               @unique
+  amount      Decimal              @db.Decimal(10, 2)
+  status      InsuranceClaimStatus @default(SUBMITTED)
+  submittedAt DateTime             @default(now())
+  approvedAt  DateTime?
+
+  @@map("insurance_claims")
+}
+
+model TelemedicineSession {
+  id            String                    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant                    @relation(fields: [tenantId], references: [id])
+  appointmentId String                    @unique
+  appointment   Appointment               @relation(fields: [appointmentId], references: [id])
+  roomId        String                    @unique
+  status        TelemedicineSessionStatus @default(WAITING)
+  startedAt     DateTime?
+  endedAt       DateTime?
+
+  @@map("telemedicine_sessions")
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  tenantId               String             @unique
+  tenant                 Tenant             @relation(fields: [tenantId], references: [id])
+  plan                   TenantPlan
+  status                 SubscriptionStatus @default(ACTIVE)
+  startDate              DateTime
+  endDate                DateTime
+  amount                 Decimal            @db.Decimal(10, 2)
+  currency               String             @default("USD")
+  interval               String             @default("MONTHLY")
+  stripeSubscriptionId   String?
+  paystackSubscriptionId String?
+
+  @@map("subscriptions")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}

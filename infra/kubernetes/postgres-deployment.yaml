@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: hms-postgres
+  namespace: hms-emr
+spec:
+  serviceName: hms-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hms-postgres
+  template:
+    metadata:
+      labels:
+        app: hms-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: hms-secrets
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hms-secrets
+                  key: postgres-password
+            - name: POSTGRES_DB
+              value: hms_emr
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: '256Mi'
+              cpu: '250m'
+            limits:
+              memory: '1Gi'
+              cpu: '1000m'
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-storage
+      spec:
+        accessModes: ['ReadWriteOnce']
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hms-postgres
+  namespace: hms-emr
+spec:
+  selector:
+    app: hms-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
