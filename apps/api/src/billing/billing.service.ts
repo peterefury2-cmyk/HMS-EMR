@@ -117,7 +117,7 @@ export class BillingService {
   }
 
   async getBillingSummary(tenantId: string): Promise<BillingSummary> {
-    const [totalInvoices, paidInvoices, overdueInvoices, pendingInvoices, payments] =
+    const [totalInvoices, paidInvoices, overdueInvoices, pendingInvoices, paymentAggregate] =
       await Promise.all([
         this.prisma.invoice.count({ where: { tenantId } }),
         this.prisma.invoice.count({ where: { tenantId, status: InvoiceStatus.PAID } }),
@@ -134,7 +134,7 @@ export class BillingService {
       paidInvoices,
       overdueInvoices,
       pendingInvoices,
-      totalRevenue: payments._sum.amount,
+      totalRevenue: paymentAggregate._sum.amount,
     };
   }
 }

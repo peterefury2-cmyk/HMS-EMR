@@ -109,7 +109,7 @@ export class EmrService {
     }
 
     let bmi: number | undefined;
-    if (dto.weight != null && dto.height != null && dto.height > 0) {
+    if (dto.weight != null && dto.height != null && dto.height > 10) {
       const heightM = dto.height / 100;
       bmi = parseFloat((dto.weight / (heightM * heightM)).toFixed(2));
     }
