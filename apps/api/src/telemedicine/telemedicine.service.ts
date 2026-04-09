@@ -2,6 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID } from 'crypto';
 
+interface CreateSessionData {
+  appointmentId: string;
+}
+
+interface SendMessageData {
+  senderId: string;
+  content: string;
+  messageType?: string;
+  fileUrl?: string;
+}
+
 @Injectable()
 export class TelemedicineService {
   constructor(private prisma: PrismaService) {}
@@ -29,16 +40,11 @@ export class TelemedicineService {
     return session;
   }
 
-  async create(data: any, tenantId: string) {
+  async create(data: CreateSessionData, tenantId: string) {
     return this.prisma.telemedicineSession.create({
       data: { ...data, tenantId, roomId: randomUUID() },
       include: { appointment: true },
     });
-  }
-
-  async update(id: string, tenantId: string, data: any) {
-    await this.findOne(id, tenantId);
-    return this.prisma.telemedicineSession.update({ where: { id }, data });
   }
 
   async startSession(id: string, tenantId: string) {
@@ -50,10 +56,38 @@ export class TelemedicineService {
   }
 
   async endSession(id: string, tenantId: string) {
-    await this.findOne(id, tenantId);
+    const session = await this.findOne(id, tenantId);
+    const endedAt = new Date();
+    const durationMs = session.startedAt ? endedAt.getTime() - new Date(session.startedAt).getTime() : 0;
+    const durationMinutes = Math.round(durationMs / 60000);
+
     return this.prisma.telemedicineSession.update({
       where: { id },
-      data: { status: 'ENDED', endedAt: new Date() },
+      data: { status: 'ENDED', endedAt, ...(durationMinutes > 0 && { notes: `Duration: ${durationMinutes} minutes` }) },
+    });
+  }
+
+  async sendMessage(sessionId: string, tenantId: string, data: SendMessageData) {
+    const session = await this.findOne(sessionId, tenantId);
+    if (session.status !== 'ACTIVE') {
+      throw new NotFoundException('Session is not active');
+    }
+    return this.prisma.chatMessage.create({
+      data: {
+        sessionId,
+        senderId: data.senderId,
+        content: data.content,
+        messageType: data.messageType ?? 'TEXT',
+        fileUrl: data.fileUrl,
+      },
+    });
+  }
+
+  async getMessages(sessionId: string, tenantId: string) {
+    await this.findOne(sessionId, tenantId);
+    return this.prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
     });
   }
 }

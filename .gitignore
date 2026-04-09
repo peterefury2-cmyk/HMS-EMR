@@ -58,3 +58,4 @@ prisma/migrations/
 
 # Misc
 .turbo/
+package-lock.json
