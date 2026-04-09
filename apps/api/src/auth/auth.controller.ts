@@ -23,6 +23,7 @@ import { Role } from '@prisma/client';
 import { AuthService, UserResponse } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { LocalAuthGuard } from './local-auth.guard';
@@ -32,7 +33,7 @@ interface AuthenticatedRequest extends ExpressRequest {
   user: {
     userId: string;
     email: string;
-    role: string;
+    role: Role;
     tenantId: string | null;
   };
 }
@@ -102,7 +103,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout and invalidate refresh token' })
-  @ApiBody({ schema: { properties: { refreshToken: { type: 'string' } }, required: ['refreshToken'] } })
+  @ApiBody({ type: RefreshTokenDto })
   async logout(
     @Request() req: AuthenticatedRequest,
     @Body() body: RefreshTokenDto,
@@ -123,12 +124,12 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset email' })
-  @ApiBody({ schema: { properties: { email: { type: 'string', format: 'email' } }, required: ['email'] } })
+  @ApiBody({ type: ForgotPasswordDto })
   @ApiOkResponse({ description: 'Reset email sent if address is registered' })
   async forgotPassword(
-    @Body('email') email: string,
+    @Body() dto: ForgotPasswordDto,
   ): Promise<{ message: string }> {
-    return this.authService.forgotPassword(email);
+    return this.authService.forgotPassword(dto.email);
   }
 
   @Post('reset-password')

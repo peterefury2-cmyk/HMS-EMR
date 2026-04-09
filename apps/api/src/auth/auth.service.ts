@@ -71,8 +71,7 @@ export class AuthService {
       });
     }
 
-    const { passwordHash, ...userWithoutPassword } = user;
-    void passwordHash;
+    const { passwordHash: _passwordHash, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 
@@ -148,7 +147,6 @@ export class AuthService {
     });
 
     const { passwordHash: _ph, ...userWithoutPassword } = user;
-    void _ph;
     const tokens = this.signTokens(userWithoutPassword);
     await this.createSession(user.id, tokens.refresh_token);
 
@@ -177,7 +175,6 @@ export class AuthService {
     // Rotate refresh token
     await this.prisma.session.delete({ where: { id: session.id } });
     const { passwordHash: _ph, ...userWithoutPassword } = user;
-    void _ph;
     const tokens = this.signTokens(userWithoutPassword);
     await this.createSession(
       user.id,
