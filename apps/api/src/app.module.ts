@@ -17,6 +17,9 @@ import { TelemedicineModule } from './telemedicine/telemedicine.module';
 import { AiModule } from './ai/ai.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { FhirModule } from './fhir/fhir.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -46,6 +49,9 @@ import { NotificationsModule } from './notifications/notifications.module';
     AiModule,
     SubscriptionsModule,
     NotificationsModule,
+    FhirModule,
+    AnalyticsModule,
+    JobsModule,
   ],
 })
 export class AppModule {}
